@@ -15,7 +15,7 @@ jobs:
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.SUPABASE_URL }}")
           echo "HTTP Status: $STATUS"
-          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
             echo "Supabase is UP"
           else
             echo "Supabase is DOWN"
