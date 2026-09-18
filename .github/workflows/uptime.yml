@@ -1,0 +1,31 @@
+name: Supabase Uptime Monitor
+
+on:
+  schedule:
+    # Runs every 15 minutes (Cron syntax: minute hour day month day-of-week)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Endpoint
+        id: http
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${{ secrets.SUPABASE_URL }}")
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+            echo "Supabase is UP"
+          else
+            echo "Supabase is DOWN"
+            exit 1
+          fi
+
+      - name: Send Discord Notification on Failure
+        if: failure() && secrets.DISCORD_WEBHOOK != ''
+        run: |
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d '{"content": "🚨 **ALERT**: Your Supabase instance is down or returned an error!"}' \
+               ${{ secrets.DISCORD_WEBHOOK }}
