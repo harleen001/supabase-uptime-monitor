@@ -1,0 +1,49 @@
+name: Supabase Uptime Monitor
+
+on:
+  schedule:
+    # Runs at 00:00 UTC every 5 days (6 runs/month total)
+    - cron: '0 0 */5 * *'
+  workflow_dispatch: # Allows manual trigger from GitHub UI
+
+# Global safety limit: Kills the job if it hangs for more than 2 minutes
+concurrency:
+  group: uptime-monitor
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    # Hard timeout to prevent any runner minute leakage
+    timeout-minutes: 2
+
+    steps:
+      - name: Ping Supabase Endpoint
+        id: http
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          # Fast timeout on curl (-m 10) so network delays never drain minutes
+          STATUS=$(curl -s -m 10 -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/")
+            
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 500 ]; then
+            echo "Supabase is UP"
+          else
+            echo "Supabase is DOWN"
+            exit 1
+          fi
+
+      - name: Send Discord Notification on Failure
+        if: failure() && env.DISCORD_WEBHOOK != ''
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          curl -s -m 10 -H "Content-Type: application/json" \
+               -X POST \
+               -d '{"content": "🚨 **ALERT**: Your Supabase instance is down or returned an error!"}' \
+               "$DISCORD_WEBHOOK"
